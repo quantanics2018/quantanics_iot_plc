@@ -32,12 +32,21 @@ class Modbus():
 
     @staticmethod
     def read_modbus(register_address:int)->int:
-        return Modbus.__modbus_instance.read_register(register_address,0,Modbus.configs['fncode_read'],Modbus.configs['signed'])
+        try:
+            return Modbus.__modbus_instance.read_register(register_address,0,Modbus.configs['fncode_read'],Modbus.configs['signed'])
+        except minimalmodbus.ModbusException as e:
+            print("Unable to read from slave", e)
 
     @staticmethod
     def write_modbus(register_address:int, value:int)->int:
-        Modbus.__modbus_instance.write_bit(register_address, value,5)
+        try:
+            Modbus.__modbus_instance.write_bit(register_address, value,5)
+        except minimalmodbus.ModbusException as e:
+            print("Unable to write to slave", e)
 
     @staticmethod
     def read_modbusbit(register_address:int)->int:
-        return Modbus.__modbus_instance.read_bit(register_address,2)
+        try:
+            return Modbus.__modbus_instance.read_bit(register_address,2)
+        except minimalmodbus.ModbusException as e:
+            print("Unable to read from slave", e)

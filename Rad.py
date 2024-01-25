@@ -1,20 +1,48 @@
 from modbus import Modbus
-import time, asyncio, logging, minimalmodbus, serial
+import time, asyncio, logging, minimalmodbus, serial, pytimedinput
+from sql import SQL
 
-def begin():
-
-    current = Modbus()
-    voltage = Modbus()
-    relay = Modbus()
-    iteration_count = 0
+def menu(current,voltage,relay,sql:SQL):
 
     while True:
 
-        ### Time between each connection
-        ### 10ms keeps disconnecting every other time
-        ### 15ms works but has a high possibility of errors
-        ### 25ms running for quite some time did not produce any errors
-        device_minimum_access_time = 0.025
+        choice, timed = pytimedinput.timedInput("",5)
+
+        if timed:
+
+            begin(current,voltage,relay,sql,20)
+
+        else:
+
+            if choice == '1':
+
+                execute_relay(relay,1)
+
+            elif choice == '0':
+
+                execute_relay(relay,0)
+
+            elif choice == '9':
+
+                register_address = int(input("Enter address to toggle : "))
+                dat = relay.read_modbusbit(register_address)
+                relay.write_modbus(choice,not dat)
+
+            else:
+
+                print('Unknown Sequence.')
+                print(choice)
+
+def begin(current,voltage,relay,sql:SQL,count):
+
+    ### Time between each connection
+    ### 10ms keeps disconnecting every other time
+    ### 15ms works but has a high possibility of errors
+    ### 25ms running for quite some time did not produce any errors
+    device_minimum_access_time = 0.1
+    iteration_count = 0
+
+    for i in range(count):
 
         try:
 
@@ -22,46 +50,24 @@ def begin():
             current.configs['baudrate'] = 19200
             current.configs['slave'] = 1
             current.connect_device()
-            readCurrent(current,iteration_count)
+            current1, current2 = readCurrent(current,iteration_count)
             time.sleep(device_minimum_access_time)
             voltage.configs['baudrate'] = 19200
             voltage.configs['slave'] = 2
             voltage.connect_device()
-            readVoltage(voltage,iteration_count)
+            voltage1, voltage2 = readVoltage(voltage,iteration_count)
             time.sleep(device_minimum_access_time)
             relay.configs['baudrate'] = 9600
             relay.configs['slave'] = 3
             relay.connect_device()
-            readRelay(relay,iteration_count)
+            relay_values = readRelay(relay,iteration_count)
             print()
+            sql.push(current1,current2,voltage1,voltage2,relay_values)
             iteration_count += 1
-
-        except minimalmodbus.ModbusException as e:
-
-            print('Unable to communicate with device. Please check the power subsystem and the wiring configuration')
-            file_handler = logging.FileHandler('example.log')
-            file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-            logging.getLogger().addHandler(file_handler)
-            logging.warning("Modbus cannot be connected. Possible reasons are very low device_minimum_access_time (Unable to read multiple slave in very less time). Error message : " + str(e))
-            time.sleep(2)
-
-        except KeyboardInterrupt as e:
-
-            writeRelay(relay)
-            break
-
-        except PermissionError as e:
-
-            print('Modbus Connection Error. Check the connection port of the modbus connector or the device port connected to modbus. ', e)
-            file_handler = logging.FileHandler('example.log')
-            file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-            logging.getLogger().addHandler(file_handler)
-            logging.warning("Port Error. Most likely Modbus unplugged or device drivers not alllowing serial communication. Error message :  " + str(e))
-            time.sleep(2)
 
         except serial.serialutil.SerialException as e:
 
-            print('Modbus Connection Error. Check the connection port of the modbus connector or the device port connected to modbus. ', e)
+            print('Modbus Connection Error. Check the connection port of the modbus connector or the device port connected to modbus.')
             file_handler = logging.FileHandler('example.log')
             file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
             logging.getLogger().addHandler(file_handler)
@@ -75,7 +81,7 @@ def begin():
             file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
             logging.getLogger().addHandler(file_handler)
             logging.critical("Not Expected Error. Error message : " + str(e))
-            time.sleep(2)          
+            time.sleep(2)         
 
     return
 
@@ -96,9 +102,10 @@ def readCurrent(modbus:Modbus, iteration_count):
 
     else:
 
-        message += str(current1) + "mA |" + str(current2) + "mA"
+        message += str(current1) + "mA | " + str(current2) + "mA"
 
     print(message)
+    return current1, current2
 
 def readVoltage(modbus:Modbus, iteration_count):
 
@@ -120,6 +127,7 @@ def readVoltage(modbus:Modbus, iteration_count):
         message += str(voltage1) + " V | " + str(voltage2) + " V"
 
     print(message)
+    return voltage1, voltage2
 
 def readRelay(modbus:Modbus, iteration_count):
 
@@ -127,31 +135,7 @@ def readRelay(modbus:Modbus, iteration_count):
     relay_values_str = list(map(str,relay_values))
     message= f'[{iteration_count}]' + " | " + ' | '.join(relay_values_str) + " |"
     print(message)
-
-def writeRelay(modbus:Modbus):
-
-    while True:
-
-        pattern_value = int(input("Enter Sequence : "))
-
-        if pattern_value == 1:
-
-            execute_relay(modbus,1)
-
-        elif pattern_value == 0:
-
-            execute_relay(modbus,0)
-
-        elif pattern_value == 9:
-
-            register_address = int(input("Enter address to toggle : "))
-            dat = modbus.read_modbusbit(register_address)
-            modbus.write_modbus(pattern_value,not dat)
-
-        else:
-
-            print('Unknown Sequence.')
-            break
+    return relay_values_str
 
 def execute_relay(modbus,n):
 
@@ -162,8 +146,25 @@ async def initialize():
 
     try:
 
+        current = Modbus()
+        current.configs['baudrate'] = 19200
+        current.configs['slave'] = 1
+        current.connect_device()
+        time.sleep(1)
+        voltage = Modbus()
+        voltage.configs['baudrate'] = 19200
+        voltage.configs['slave'] = 2
+        voltage.connect_device()
+        time.sleep(1)
+        relay = Modbus()
+        relay.configs['baudrate'] = 9600
+        relay.configs['slave'] = 3
+        relay.connect_device()
+        time.sleep(1)
+        sql = SQL()
         time.sleep(3)
-        results = await asyncio.gather(begin())
+        print("Ready")
+        results = await asyncio.gather(menu(current,voltage,relay,sql))
 
     except serial.serialutil.SerialException as e:
 
