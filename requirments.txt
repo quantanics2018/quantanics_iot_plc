@@ -1,0 +1,5 @@
+minimalmodbus==2.1.1
+paho-mqtt==1.6.1
+persist-queue==0.8.1
+pyserial==3.5
+toml==0.10.2
