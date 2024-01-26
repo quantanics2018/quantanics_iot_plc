@@ -1,6 +1,8 @@
 from modbus import Modbus
 import time, asyncio, logging, minimalmodbus, serial, pytimedinput
 from sql import SQL
+from mqtt import Mqtt
+from datetime import datetime
 
 def menu(current,voltage,relay,sql:SQL):
 
@@ -63,6 +65,14 @@ def begin(current,voltage,relay,sql:SQL,count):
             relay_values = readRelay(relay,iteration_count)
             print()
             sql.push(current1,current2,voltage1,voltage2,relay_values)
+            '''mqtt.send({
+                "current1" : current1,
+                "current2" : current2,
+                "voltage1" : voltage1,
+                "voltage2" : voltage2,
+                "relay_values" : relay_values,
+                "gateway_time":str(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            },'data_log')'''
             iteration_count += 1
 
         except serial.serialutil.SerialException as e:

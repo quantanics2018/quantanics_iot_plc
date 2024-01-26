@@ -10,9 +10,6 @@ class Mqtt():
 
     def on_connect(client, userdata, flags, rc):
         print("Connected")
-        client.subscribe(Mqtt.__configs["config_update_topic"])
-        client.subscribe(Mqtt.__configs["events_topic"])
-
 
     def on_disconnect(client, userdata, rc):
         print("disconnected")
