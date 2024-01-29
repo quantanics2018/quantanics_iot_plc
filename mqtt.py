@@ -3,16 +3,16 @@ import paho.mqtt.client as mqtt
 from events import EventCallback
 from configuration import Configuration, MqttCallbackConfiguration
 
-
 class Mqtt():
     __mqtt_instance:mqtt = None
     __configs:dict = None
 
     def on_connect(client, userdata, flags, rc):
-        print("Connected")
+        print("MQTT Connected")
+        client.subscribe('Data')
 
     def on_disconnect(client, userdata, rc):
-        print("disconnected")
+        print("MQTT Disconnected")
         Mqtt.retry()
 
     def __new__(cls) -> None:
@@ -29,7 +29,6 @@ class Mqtt():
         Mqtt.__mqtt_instance.on_connect = Mqtt.on_connect
         Mqtt.__mqtt_instance.on_disconnect = Mqtt.on_disconnect
         Mqtt.__mqtt_instance.username_pw_set(Mqtt.__configs["username"], Mqtt.__configs["password"])
-        Mqtt.add_callbacks()
         try:
             Mqtt.__mqtt_instance.connect_async(Mqtt.__configs["host"],Mqtt.__configs["port"])
             Mqtt.__mqtt_instance.loop_start()
@@ -47,12 +46,6 @@ class Mqtt():
     @staticmethod
     def connection_status() -> bool:
         return Mqtt.__mqtt_instance.is_connected()
-    
-    @staticmethod
-    def add_callbacks():
-        print("adding callbacks")
-        Mqtt.__mqtt_instance.message_callback_add(Mqtt.__configs["config_update_topic"],MqttCallbackConfiguration.on_message)
-        Mqtt.__mqtt_instance.message_callback_add(Mqtt.__configs["events_topic"], EventCallback.on_message)
     
     @staticmethod
     def send(payload:dict, topic:str):

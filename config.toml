@@ -33,6 +33,45 @@ slave = 2
 stopbits = 1
 timeout = 1
 
+[Current]
+baudrate = 19200
+bytesize = 8
+debug = false
+fncode_read = 4
+fncode_write = 5
+port = "COM4"
+parity = "N"
+signed = true
+slave = 1
+stopbits = 1
+timeout = 1
+
+[Voltage]
+baudrate = 19200
+bytesize = 8
+debug = false
+fncode_read = 4
+fncode_write = 5
+port = "COM4"
+parity = "N"
+signed = true
+slave = 2
+stopbits = 1
+timeout = 1
+
+[Relay]
+baudrate = 9600
+bytesize = 8
+debug = false
+fncode_read = 4
+fncode_write = 5
+port = "COM4"
+parity = "N"
+signed = true
+slave = 3
+stopbits = 1
+timeout = 1
+
 [LED_Modbus]
 led1 = 4
 led2 = 64

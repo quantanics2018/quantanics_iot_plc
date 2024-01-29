@@ -1,76 +1,65 @@
-from modbus import Modbus
-import time, asyncio, logging, minimalmodbus, serial, pytimedinput
-from sql import SQL
+import time
+import asyncio
+import logging
+import serial
 from mqtt import Mqtt
 from datetime import datetime
+from current import Current
+from voltage import Voltage
+from relay import Relay
+from mqttread import Mqt2
 
-def menu(current,voltage,relay,sql:SQL,mqtt):
+relay = Relay()
+
+def checkt():
+
+    return
+
+async def begin(current, voltage, relay, mqtt):
+
+    global s, t
+
+    device_minimum_access_time = 0.2
+    iteration_count = 0
 
     while True:
 
-        choice, timed = pytimedinput.timedInput("",5)
-        if timed:
-
-            begin(current,voltage,relay,sql,mqtt,20)
-
-        else:
-
-            if choice == '1':
-
-                execute_relay(relay,1)
-
-            elif choice == '0':
-
-                execute_relay(relay,0)
-
-            elif choice == '9':
-
-                register_address = int(input("Enter address to toggle : "))
-                dat = relay.read_modbusbit(register_address)
-                relay.write_modbus(register_address,not dat)
-
-            else:
-
-                print('Unknown Sequence.')
-                print(choice)
-
-def begin(current,voltage,relay,sql:SQL,mqtt,count):
-
-    ### Time between each connection
-    ### 10ms keeps disconnecting every other time
-    ### 15ms works but has a high possibility of errors
-    ### 25ms running for quite some time did not produce any errors
-    device_minimum_access_time = 0.1
-    iteration_count = 0
-
-    for i in range(count):
-
         try:
 
-            time.sleep(device_minimum_access_time)
-            current.configs['baudrate'] = 19200
-            current.configs['slave'] = 1
+            with open('data.txt') as f:
+                d = f.read()
+
+            op = int(d)
+
+            await asyncio.sleep(device_minimum_access_time)
             current.connect_device()
-            current1, current2 = readCurrent(current,iteration_count)
-            time.sleep(device_minimum_access_time)
-            voltage.configs['baudrate'] = 19200
-            voltage.configs['slave'] = 2
+            current1, current2 = await readCurrent(current, iteration_count)
+
+            await asyncio.sleep(device_minimum_access_time)
             voltage.connect_device()
-            voltage1, voltage2 = readVoltage(voltage,iteration_count)
-            time.sleep(device_minimum_access_time)
-            relay.configs['baudrate'] = 9600
-            relay.configs['slave'] = 3
+            voltage1, voltage2 = await readVoltage(voltage, iteration_count)
+
+
+            await asyncio.sleep(device_minimum_access_time)
             relay.connect_device()
-            relay_values = readRelay(relay,iteration_count)
+            relay_values = await readRelay(relay, iteration_count)
+
             print()
-            sql.push((current1 + current2) / 2,(voltage1 + voltage2) / 2,relay_values)
+
             mqtt.send({
-                "current" : (current1 + current2) / 2,
-                "voltage" : (voltage1 + voltage2) / 2,
-                "relay_values" : relay_values,
-                "gateway_time":str(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            },'data_log')
+                "current": (current1 + current2) / 2,
+                "voltage": (voltage1 + voltage2) / 2,
+                "relay_values": relay_values,
+                "gateway_time": str(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            }, 'data_log')
+
+            if op != -1:
+
+                await choose(op)
+
             iteration_count += 1
+
+            await asyncio.sleep(0)
 
         except serial.serialutil.SerialException as e:
 
@@ -78,7 +67,7 @@ def begin(current,voltage,relay,sql:SQL,mqtt,count):
             file_handler = logging.FileHandler('example.log')
             file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
             logging.getLogger().addHandler(file_handler)
-            logging.warning("Port Error. Most likely Modbus unplugged or device drivers not alllowing serial communication. Error message :  " + str(e))
+            logging.warning("Port Error. Most likely Modbus unplugged or device drivers not allowing serial communication. Error message :  " + str(e))
             time.sleep(2)
 
         except Exception as e:
@@ -88,91 +77,113 @@ def begin(current,voltage,relay,sql:SQL,mqtt,count):
             file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
             logging.getLogger().addHandler(file_handler)
             logging.critical("Not Expected Error. Error message : " + str(e))
-            time.sleep(2)         
+            time.sleep(2)
 
     return
 
-def readCurrent(modbus:Modbus, iteration_count):
+async def readCurrent(current: Current, iteration_count):
 
     message = f'[{iteration_count}] '
     message += "Current : "
-    current1 = modbus.read_modbus(0)
-    current2 = modbus.read_modbus(1)
+    current1 = current.read_modbus(0)
+    current2 = current.read_modbus(1)
 
     if current1 + current2 < 10:
-
         message += "0 mA"
-
     elif current1 + current2 > 40500:
-
         message += "0 mA"
-
     else:
-
         message += str(current1) + "mA | " + str(current2) + "mA"
 
     print(message)
+    await asyncio.sleep(0)
     return current1, current2
 
-def readVoltage(modbus:Modbus, iteration_count):
+async def readVoltage(voltage: Voltage, iteration_count):
 
     message = f'[{iteration_count}] '
     message += "Voltage : "
-    voltage1 = modbus.read_modbus(0)
-    voltage2 = modbus.read_modbus(1)
+    voltage1 = voltage.read_modbus(0)
+    voltage2 = voltage.read_modbus(1)
 
     if voltage1 + voltage2 < 25:
-
         message += "0 V"
-
     elif voltage1 + voltage2 > 20200:
-
         message += "0 V"
-
     else:
-
         message += str(voltage1) + " V | " + str(voltage2) + " V"
 
     print(message)
+    await asyncio.sleep(0)
     return voltage1, voltage2
 
-def readRelay(modbus:Modbus, iteration_count):
+async def readRelay(relay: Relay, iteration_count):
 
-    relay_values = [modbus.read_modbusbit(val) for val in range(0,14)]
-    relay_values_str = list(map(str,relay_values))
-    message= f'[{iteration_count}]' + " | " + ' | '.join(relay_values_str) + " |"
+    relay_values = []
+
+    for i in range(14):
+
+        relay_values.append(relay.read_modbusbit(i))
+
+    relay_values_str = list(map(str, relay_values))
+    message = f'[{iteration_count}]' + " | " + ' | '.join(relay_values_str) + " |"
+
     print(message)
+    await asyncio.sleep(0)
     return relay_values_str
 
-def execute_relay(modbus,n):
+async def execute_relay(relay, n):
 
-    for i in range(0,14):
-        modbus.write_modbus(i,n)
+    for i in range(0, 14):
+        relay.write_modbus(i, n)
+
+async def choose(choice):
+
+    global relay
+
+    await asyncio.sleep(1)
+    relay.connect_device()
+
+    if choice == 1:
+        await execute_relay(relay, 1)
+    else:
+        await execute_relay(relay, 0)
+
+    with open("data.txt","w") as f:
+        f.write("-1")
+
+    await asyncio.sleep(1)
+
+def menu(choice):
+
+    with open("data.txt","w") as f:
+        f.write(str(choice))
+
+async def count():
+
+    mqt2 = Mqt2()
+    await asyncio.sleep(1)
 
 async def initialize():
 
+    global l
+
     try:
 
-        current = Modbus()
-        current.configs['baudrate'] = 19200
-        current.configs['slave'] = 1
-        current.connect_device()
+        current = Current()
         time.sleep(1)
-        voltage = Modbus()
-        voltage.configs['baudrate'] = 19200
-        voltage.configs['slave'] = 2
-        voltage.connect_device()
+
+        voltage = Voltage()
         time.sleep(1)
-        relay = Modbus()
-        relay.configs['baudrate'] = 9600
-        relay.configs['slave'] = 3
-        relay.connect_device()
-        time.sleep(1)
-        sql = SQL()
+
         mqtt = Mqtt()
-        time.sleep(3)
+        time.sleep(2)
+
         print("Ready")
-        results = await asyncio.gather(menu(current,voltage,relay,sql,mqtt))
+
+        task1 = asyncio.create_task(begin(current, voltage, relay, mqtt))
+        task2 = asyncio.create_task(count())
+        results = await asyncio.gather(task1, task2)
 
     except serial.serialutil.SerialException as e:
 
@@ -180,7 +191,7 @@ async def initialize():
         file_handler = logging.FileHandler('example.log')
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         logging.getLogger().addHandler(file_handler)
-        logging.error("Port Error. Most likely Modbus unplugged or device drivers not alllowing serial communication. Error message :  " + str(e))
+        logging.error("Port Error. Most likely Modbus unplugged or device drivers not allowing serial communication. Error message :  " + str(e))
         time.sleep(2)
 
 if __name__ == '__main__':
