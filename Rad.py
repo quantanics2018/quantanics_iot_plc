@@ -10,6 +10,8 @@ from relay import Relay
 from mqttread import Mqt2
 
 relay = Relay()
+current = Current()
+voltage = Voltage()
 
 def checkt():
 
@@ -33,12 +35,13 @@ async def begin(current, voltage, relay, mqtt):
 
             await asyncio.sleep(device_minimum_access_time)
             current.connect_device()
-            current1, current2 = await readCurrent(current, iteration_count)
+            current1, current2, i = await readCurrent(current, iteration_count)
 
             await asyncio.sleep(device_minimum_access_time)
             voltage.connect_device()
-            voltage1, voltage2 = await readVoltage(voltage, iteration_count)
+            voltage1, voltage2, v = await readVoltage(voltage, iteration_count)
 
+            await readvirelay(v, i, iteration_count)
 
             await asyncio.sleep(device_minimum_access_time)
             relay.connect_device()
@@ -87,6 +90,7 @@ async def readCurrent(current: Current, iteration_count):
     message += "Current : "
     current1 = current.read_modbus(0)
     current2 = current.read_modbus(1)
+    i = [current.read_modbusbit(0), current.read_modbusbit(1)]
 
     if current1 + current2 < 10:
         message += "0 mA"
@@ -97,7 +101,7 @@ async def readCurrent(current: Current, iteration_count):
 
     print(message)
     await asyncio.sleep(0)
-    return current1, current2
+    return current1, current2, i
 
 async def readVoltage(voltage: Voltage, iteration_count):
 
@@ -105,6 +109,7 @@ async def readVoltage(voltage: Voltage, iteration_count):
     message += "Voltage : "
     voltage1 = voltage.read_modbus(0)
     voltage2 = voltage.read_modbus(1)
+    v = [voltage.read_modbusbit(0), voltage.read_modbusbit(1)]
 
     if voltage1 + voltage2 < 25:
         message += "0 V"
@@ -115,7 +120,7 @@ async def readVoltage(voltage: Voltage, iteration_count):
 
     print(message)
     await asyncio.sleep(0)
-    return voltage1, voltage2
+    return voltage1, voltage2, v
 
 async def readRelay(relay: Relay, iteration_count):
 
@@ -132,6 +137,11 @@ async def readRelay(relay: Relay, iteration_count):
     await asyncio.sleep(0)
     return relay_values_str
 
+async def readvirelay(v,i,iteration_count):
+
+    message = f'[{iteration_count}]' + " | " + ' | '.join(list(map(str,i))) + " || " + ' | '.join(list(map(str,v))) + " |"
+    print(message)
+
 async def execute_relay(relay, n):
 
     for i in range(0, 14):
@@ -139,15 +149,40 @@ async def execute_relay(relay, n):
 
 async def choose(choice):
 
-    global relay
+    global relay,current,voltage
 
     await asyncio.sleep(1)
-    relay.connect_device()
 
     if choice == 1:
+
+        relay.connect_device()
         await execute_relay(relay, 1)
-    else:
+
+    elif choice == 0:
+
+        relay.connect_device()
         await execute_relay(relay, 0)
+
+    elif choice >= 80:
+
+        relay.connect_device()
+        dat = relay.read_modbusbit(choice-80)
+        await asyncio.sleep(0.1)
+        relay.write_modbus(choice-80,not dat)
+
+    elif choice >= 70:
+
+        voltage.connect_device()
+        dat = voltage.read_modbusbit(choice-70)
+        await asyncio.sleep(0.1)
+        voltage.write_modbus(choice-70,not dat)
+
+    elif choice >= 60:
+
+        current.connect_device()
+        dat = current.read_modbusbit(choice-60)
+        await asyncio.sleep(0.1)
+        current.write_modbus(choice-60,not dat)
 
     with open("data.txt","w") as f:
         f.write("-1")
@@ -170,11 +205,7 @@ async def initialize():
 
     try:
 
-        current = Current()
-        time.sleep(1)
-
-        voltage = Voltage()
-        time.sleep(1)
+        time.sleep(3)
 
         mqtt = Mqtt()
         time.sleep(2)

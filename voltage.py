@@ -48,6 +48,6 @@ class Voltage():
     @staticmethod
     def read_modbusbit(register_address:int)->int:
         try:
-            return Voltage.__modbus_instance.read_bit(register_address,2)
+            return Voltage.__modbus_instance.read_bit(register_address,1)
         except minimalmodbus.ModbusException as e:
             print("Unable to read from slave", e)
