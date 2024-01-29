@@ -12,8 +12,8 @@ machine_id = "1"
 [Mqtt]
 host = "quantanics.in"
 port = 1883
-username = "quantanicsabcd"
-password = "quantanics4321"
+username = "quantanics"
+password = "quantanics123"
 qos = 2
 config_update_topic = "update_configs"
 events_topic = "/chennai/S1002/1"

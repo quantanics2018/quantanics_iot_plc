@@ -21,7 +21,7 @@ class SQL():
         self.cur.execute(sql)
         self.db.commit()
 
-        sql = 'CREATE TABLE IF NOT EXISTS DataLog(Current1 int, Current2 int, Voltage1 int, Voltage2 int,'
+        sql = 'CREATE TABLE IF NOT EXISTS DataLog(Current int, Voltage int,'
         
         for i in range(0,14):
             sql += 'Relay' + str(i) + ' int,'
@@ -30,19 +30,17 @@ class SQL():
         self.cur.execute(sql)
         self.db.commit()
 
-    def push(self, current1, current2, voltage1, voltage2, relay_values):
+    def push(self, current, voltage, relay_values):
 
-        sql = "INSERT INTO DataLog(Current1, Current2, Voltage1, Voltage2,"
+        sql = "INSERT INTO DataLog(Current, Voltage,"
         
         for i in range(0,14):
             sql += 'Relay' + str(i) + ', '
 
         sql = sql[:-2] + ') '    
         sql += " VALUES("
-        sql += str(current1) + ','
-        sql += str(current2) + ','
-        sql += str(voltage1) + ','
-        sql += str(voltage2) + ','
+        sql += str(current) + ','
+        sql += str(voltage) + ','
 
         sql += ', '.join(relay_values)
         sql += ');'

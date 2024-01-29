@@ -4,15 +4,14 @@ from sql import SQL
 from mqtt import Mqtt
 from datetime import datetime
 
-def menu(current,voltage,relay,sql:SQL):
+def menu(current,voltage,relay,sql:SQL,mqtt):
 
     while True:
 
         choice, timed = pytimedinput.timedInput("",5)
-
         if timed:
 
-            begin(current,voltage,relay,sql,20)
+            begin(current,voltage,relay,sql,mqtt,20)
 
         else:
 
@@ -28,14 +27,14 @@ def menu(current,voltage,relay,sql:SQL):
 
                 register_address = int(input("Enter address to toggle : "))
                 dat = relay.read_modbusbit(register_address)
-                relay.write_modbus(choice,not dat)
+                relay.write_modbus(register_address,not dat)
 
             else:
 
                 print('Unknown Sequence.')
                 print(choice)
 
-def begin(current,voltage,relay,sql:SQL,count):
+def begin(current,voltage,relay,sql:SQL,mqtt,count):
 
     ### Time between each connection
     ### 10ms keeps disconnecting every other time
@@ -64,15 +63,13 @@ def begin(current,voltage,relay,sql:SQL,count):
             relay.connect_device()
             relay_values = readRelay(relay,iteration_count)
             print()
-            sql.push(current1,current2,voltage1,voltage2,relay_values)
-            '''mqtt.send({
-                "current1" : current1,
-                "current2" : current2,
-                "voltage1" : voltage1,
-                "voltage2" : voltage2,
+            sql.push((current1 + current2) / 2,(voltage1 + voltage2) / 2,relay_values)
+            mqtt.send({
+                "current" : (current1 + current2) / 2,
+                "voltage" : (voltage1 + voltage2) / 2,
                 "relay_values" : relay_values,
                 "gateway_time":str(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            },'data_log')'''
+            },'data_log')
             iteration_count += 1
 
         except serial.serialutil.SerialException as e:
@@ -172,9 +169,10 @@ async def initialize():
         relay.connect_device()
         time.sleep(1)
         sql = SQL()
+        mqtt = Mqtt()
         time.sleep(3)
         print("Ready")
-        results = await asyncio.gather(menu(current,voltage,relay,sql))
+        results = await asyncio.gather(menu(current,voltage,relay,sql,mqtt))
 
     except serial.serialutil.SerialException as e:
 
