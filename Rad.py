@@ -88,9 +88,9 @@ async def readCurrent(current: Current, iteration_count):
     current2 = current.read_modbus(1) / 1000
     i = [current.read_modbusbit(0), current.read_modbusbit(1)]
 
-    if current1 + current2 < 10:
+    if current1 + current2 < 0.010:
         message += "0 mA"
-    elif current1 + current2 > 40500:
+    elif current1 + current2 > 40.500:
         message += "0 mA"
     else:
         message += str(current1) + "mA | " + str(current2) + "mA"
@@ -107,9 +107,9 @@ async def readVoltage(voltage: Voltage, iteration_count):
     voltage2 = voltage.read_modbus(1) / 1000
     v = [voltage.read_modbusbit(0), voltage.read_modbusbit(1)]
 
-    if voltage1 + voltage2 < 25:
+    if voltage1 + voltage2 < 0.025:
         message += "0 V"
-    elif voltage1 + voltage2 > 20200:
+    elif voltage1 + voltage2 > 20.200:
         message += "0 V"
     else:
         message += str(voltage1) + " V | " + str(voltage2) + " V"
