@@ -25,19 +25,19 @@ async def begin(current, voltage, relay, mqtt):
         try:
 
             with open('data.txt') as f:
-                d = f.read()
+                data = f.read()
 
-            op = int(d)
+            output = int(data)
 
             await asyncio.sleep(device_minimum_access_time)
             current.connect_device()
-            current1, current2, i = await readCurrent(current, iteration_count)
+            current1, current2, current_relay = await readCurrent(current, iteration_count)
 
             await asyncio.sleep(device_minimum_access_time)
             voltage.connect_device()
-            voltage1, voltage2, v = await readVoltage(voltage, iteration_count)
+            voltage1, voltage2, voltage_relay = await readVoltage(voltage, iteration_count)
 
-            await readvirelay(v, i, iteration_count)
+            await read_volatage_current_relay(voltage_relay, current_relay, iteration_count)
 
             await asyncio.sleep(device_minimum_access_time)
             relay.connect_device()
@@ -52,9 +52,9 @@ async def begin(current, voltage, relay, mqtt):
                 "gateway_time": str(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             }, 'data_log')
 
-            if op != -1:
+            if output != -1:
 
-                await choose(op)
+                await execute(output)
 
             iteration_count += 1
 
@@ -133,9 +133,9 @@ async def readRelay(relay: Relay, iteration_count):
     await asyncio.sleep(0)
     return relay_values_str
 
-async def readvirelay(v,i,iteration_count):
+async def read_volatage_current_relay(voltage_relay,current_relay,iteration_count):
 
-    message = f'[{iteration_count}]' + " | " + ' | '.join(list(map(str,i))) + " | " + ' | '.join(list(map(str,v))) + " |"
+    message = f'[{iteration_count}]' + " | " + ' | '.join(list(map(str,current_relay))) + " | " + ' | '.join(list(map(str,voltage_relay))) + " |"
     print(message)
 
 async def execute_relay(relay, n):
@@ -143,7 +143,7 @@ async def execute_relay(relay, n):
     for i in range(0, 14):
         relay.write_modbus(i, n)
 
-async def choose(choice):
+async def execute(choice):
 
     global relay,current,voltage,fourrelay
 
@@ -209,8 +209,6 @@ async def count():
 
 async def initialize():
 
-    global l
-
     try:
 
         time.sleep(3)
@@ -223,6 +221,8 @@ async def initialize():
         task1 = asyncio.create_task(begin(current, voltage, relay, mqtt))
         task2 = asyncio.create_task(count())
         results = await asyncio.gather(task1, task2)
+
+        return results
 
     except serial.serialutil.SerialException as e:
 
