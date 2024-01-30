@@ -7,21 +7,17 @@ from datetime import datetime
 from current import Current
 from voltage import Voltage
 from relay import Relay
+from fourrelay import fourRelay
 from mqttread import Mqt2
 
 relay = Relay()
 current = Current()
 voltage = Voltage()
-
-def checkt():
-
-    return
+fourrelay = fourRelay()
 
 async def begin(current, voltage, relay, mqtt):
 
-    global s, t
-
-    device_minimum_access_time = 0.2
+    device_minimum_access_time = 0.02
     iteration_count = 0
 
     while True:
@@ -88,8 +84,8 @@ async def readCurrent(current: Current, iteration_count):
 
     message = f'[{iteration_count}] '
     message += "Current : "
-    current1 = current.read_modbus(0)
-    current2 = current.read_modbus(1)
+    current1 = current.read_modbus(0) / 1000
+    current2 = current.read_modbus(1) / 1000
     i = [current.read_modbusbit(0), current.read_modbusbit(1)]
 
     if current1 + current2 < 10:
@@ -107,8 +103,8 @@ async def readVoltage(voltage: Voltage, iteration_count):
 
     message = f'[{iteration_count}] '
     message += "Voltage : "
-    voltage1 = voltage.read_modbus(0)
-    voltage2 = voltage.read_modbus(1)
+    voltage1 = voltage.read_modbus(0) / 1000
+    voltage2 = voltage.read_modbus(1) / 1000
     v = [voltage.read_modbusbit(0), voltage.read_modbusbit(1)]
 
     if voltage1 + voltage2 < 25:
@@ -139,7 +135,7 @@ async def readRelay(relay: Relay, iteration_count):
 
 async def readvirelay(v,i,iteration_count):
 
-    message = f'[{iteration_count}]' + " | " + ' | '.join(list(map(str,i))) + " || " + ' | '.join(list(map(str,v))) + " |"
+    message = f'[{iteration_count}]' + " | " + ' | '.join(list(map(str,i))) + " | " + ' | '.join(list(map(str,v))) + " |"
     print(message)
 
 async def execute_relay(relay, n):
@@ -149,7 +145,7 @@ async def execute_relay(relay, n):
 
 async def choose(choice):
 
-    global relay,current,voltage
+    global relay,current,voltage,fourrelay
 
     await asyncio.sleep(1)
 
@@ -183,6 +179,18 @@ async def choose(choice):
         dat = current.read_modbusbit(choice-60)
         await asyncio.sleep(0.1)
         current.write_modbus(choice-60,not dat)
+
+    elif choice >= 20:
+
+        fourrelay.connect_device()
+        await asyncio.sleep(0.1)
+        fourrelay.write_modbus(choice-20,1)
+
+    elif choice >= 10:
+
+        fourrelay.connect_device()
+        await asyncio.sleep(0.1)
+        fourrelay.write_modbus(choice-10,0)
 
     with open("data.txt","w") as f:
         f.write("-1")
